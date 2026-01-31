@@ -161,18 +161,30 @@ def save_to_sheets(team, directive, analysis, config):
 
 # Google Sheets에서 불러오기
 def load_from_sheets(config):
-    """Google Sheets에서 히스토리 불러오기"""
+    """Google Sheets에서 히스토리 불러오기 (브랜드 + 육가공 합치기)"""
+    all_data = []
+    
+    # 브랜드 시트에서 불러오기
     try:
-        url = f"{config['apps_script_url']}?sheetName={config['sheet_name']}"
-        response = requests.get(url, timeout=10)
-        data = response.json()
-        
-        if data.get('success') and data.get('data'):
-            return data['data']
-        return []
+        url_brand = f"{config['apps_script_url_brand']}?sheetName={config['sheet_name']}"
+        response_brand = requests.get(url_brand, timeout=10)
+        data_brand = response_brand.json()
+        if data_brand.get('success') and data_brand.get('data'):
+            all_data.extend(data_brand['data'])
     except Exception as e:
-        st.error(f"히스토리 로드 실패: {str(e)}")
-        return []
+        st.warning(f"브랜드 히스토리 로드 실패: {str(e)}")
+    
+    # 육가공 시트에서 불러오기
+    try:
+        url_meat = f"{config['apps_script_url_meat']}?sheetName={config['sheet_name']}"
+        response_meat = requests.get(url_meat, timeout=10)
+        data_meat = response_meat.json()
+        if data_meat.get('success') and data_meat.get('data'):
+            all_data.extend(data_meat['data'])
+    except Exception as e:
+        st.warning(f"육가공 히스토리 로드 실패: {str(e)}")
+    
+    return all_data
 
 # 팀 뱃지 생성
 def get_team_badge(team):
