@@ -74,7 +74,8 @@ def get_config():
         return {
             'cf_account_id': st.secrets['cloudflare']['account_id'],
             'cf_api_token': st.secrets['cloudflare']['api_token'],
-            'apps_script_url': st.secrets['google']['apps_script_url'],
+            'apps_script_url_brand': st.secrets['google']['apps_script_url_brand'],
+            'apps_script_url_meat': st.secrets['google']['apps_script_url_meat'],
             'sheet_name': st.secrets['google'].get('sheet_name', '지시사항분석')
         }
     except Exception as e:
