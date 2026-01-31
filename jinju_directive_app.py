@@ -6,7 +6,7 @@ import pandas as pd
 
 # 페이지 설정
 st.set_page_config(
-    page_title="진주햄 메시지 분석",
+    page_title="진주햄 지시사항 분석",
     page_icon="📋",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -75,7 +75,7 @@ def get_config():
             'cf_account_id': st.secrets['cloudflare']['account_id'],
             'cf_api_token': st.secrets['cloudflare']['api_token'],
             'apps_script_url': st.secrets['google']['apps_script_url'],
-            'sheet_name': st.secrets['google'].get('sheet_name', '메시지분석')
+            'sheet_name': st.secrets['google'].get('sheet_name', '지시사항분석')
         }
     except Exception as e:
         st.error(f"⚠️ Secrets 설정을 확인해주세요: {str(e)}")
@@ -88,14 +88,14 @@ def get_config():
         
         [google]
         apps_script_url = "https://script.google.com/macros/s/.../exec"
-        sheet_name = "메시지분석"
+        sheet_name = "지시사항분석"
         ```
         """)
         return None
 
 # AI 분석 함수
 def analyze_with_ai(directive_text, config):
-    """Cloudflare Workers AI로 메시지 분석"""
+    """Cloudflare Workers AI로 지시사항 분석"""
     url = f"https://api.cloudflare.com/client/v4/accounts/{config['cf_account_id']}/ai/run/@cf/meta/llama-3.1-8b-instruct"
     
     headers = {
@@ -107,11 +107,11 @@ def analyze_with_ai(directive_text, config):
         "messages": [
             {
                 "role": "system",
-                "content": "당신은 진주햄의 업무 분석 AI 비서입니다. 메시지을 분석하여 반드시 다음 형식으로만 답변하세요:\n\n📌 요약:\n(핵심 내용을 2-3문장으로 간결하게)\n\n🎯 의도:\n(메시지의 목적과 배경 설명)\n\n✅ 해야할 일:\n1. (구체적인 액션 아이템)\n2. (구체적인 액션 아이템)\n3. (구체적인 액션 아이템)\n\n한국어로 답변하고, 육가공 산업 용어를 사용하세요."
+                "content": "당신은 진주햄의 업무 분석 AI 비서입니다. 본부장님의 지시사항을 분석하여 반드시 다음 형식으로만 답변하세요:\n\n📌 요약:\n(핵심 내용을 2-3문장으로 간결하게)\n\n🎯 의도:\n(지시사항의 목적과 배경 설명)\n\n✅ 해야할 일:\n1. (구체적인 액션 아이템)\n2. (구체적인 액션 아이템)\n3. (구체적인 액션 아이템)\n\n한국어로 답변하고, 육가공 산업 용어를 사용하세요."
             },
             {
                 "role": "user",
-                "content": f"다음 메시지을 분석해주세요:\n\n{directive_text}"
+                "content": f"다음 본부장님의 지시사항을 분석해주세요:\n\n{directive_text}"
             }
         ],
         "max_tokens": 1000
@@ -175,11 +175,41 @@ def get_team_badge(team):
     badge_class = badge_classes.get(team, 'team-brand')
     return f'<span class="team-badge {badge_class}">{team}</span>'
 
+# AI 분석 결과 파싱
+def parse_analysis(analysis):
+    """AI 분석 결과를 요약/의도/해야할일로 분리"""
+    sections = {
+        'summary': '',
+        'intent': '',
+        'tasks': ''
+    }
+    
+    lines = analysis.split('\n')
+    current_section = None
+    
+    for line in lines:
+        line = line.strip()
+        
+        if '요약:' in line or '📌 요약' in line:
+            current_section = 'summary'
+            continue
+        elif '의도:' in line or '🎯 의도' in line:
+            current_section = 'intent'
+            continue
+        elif '해야할 일:' in line or '✅ 해야할 일' in line or '해야 할 일:' in line:
+            current_section = 'tasks'
+            continue
+        
+        if current_section and line:
+            sections[current_section] += line + '\n'
+    
+    return sections
+
 # 메인 앱
 def main():
     # 헤더
-    st.title("📋 진주햄 메시지 분석")
-    st.markdown("Workers AI를 활용한 메시지 자동 분석 시스템")
+    st.title("📋 진주햄 본부장 지시사항 분석")
+    st.markdown("Workers AI를 활용한 지시사항 자동 분석 시스템")
     
     # 설정 확인
     config = get_config()
@@ -216,11 +246,11 @@ def main():
                     st.metric(f"{team} 팀", count)
     
     # 메인 컨텐츠
-    tab1, tab2 = st.tabs(["✍️ 메시지 분석", "📚 히스토리"])
+    tab1, tab2 = st.tabs(["✍️ 지시사항 분석", "📚 히스토리"])
     
-    # Tab 1: 메시지 분석
+    # Tab 1: 지시사항 분석
     with tab1:
-        st.header("메시지 입력")
+        st.header("지시사항 입력")
         
         col1, col2 = st.columns([1, 3])
         
@@ -235,25 +265,42 @@ def main():
             pass
         
         directive_text = st.text_area(
-            "메시지 내용",
+            "지시사항 내용",
             height=200,
-            placeholder="메시지을 입력하세요..."
+            placeholder="본부장님의 지시사항을 입력하세요..."
         )
         
         if st.button("🤖 AI 분석 시작", type="primary"):
             if not team:
                 st.error("팀 구분을 선택해주세요.")
             elif not directive_text.strip():
-                st.error("메시지 내용을 입력해주세요.")
+                st.error("지시사항 내용을 입력해주세요.")
             else:
-                with st.spinner("AI가 메시지을 분석 중입니다..."):
+                with st.spinner("AI가 지시사항을 분석 중입니다..."):
                     try:
                         # AI 분석
                         analysis = analyze_with_ai(directive_text, config)
                         
                         # 결과 표시
                         st.markdown(f"### 🤖 AI 분석 결과 {get_team_badge(team)}", unsafe_allow_html=True)
-                        st.markdown(f'<div class="result-box">{analysis}</div>', unsafe_allow_html=True)
+                        
+                        # 분석 결과를 섹션별로 파싱
+                        sections = parse_analysis(analysis)
+                        
+                        # 요약
+                        if sections.get('summary'):
+                            st.markdown("#### 📌 요약")
+                            st.info(sections['summary'])
+                        
+                        # 의도
+                        if sections.get('intent'):
+                            st.markdown("#### 🎯 의도")
+                            st.warning(sections['intent'])
+                        
+                        # 해야할 일
+                        if sections.get('tasks'):
+                            st.markdown("#### ✅ 해야할 일")
+                            st.success(sections['tasks'])
                         
                         # Google Sheets에 저장
                         if save_to_sheets(team, directive_text, analysis, config):
@@ -268,7 +315,7 @@ def main():
     
     # Tab 2: 히스토리
     with tab2:
-        st.header("메시지 히스토리")
+        st.header("지시사항 히스토리")
         
         # 필터
         filter_col1, filter_col2 = st.columns([3, 1])
@@ -316,8 +363,8 @@ def main():
                                 unsafe_allow_html=True
                             )
                         
-                        # 메시지
-                        st.markdown(f"**메시지:**")
+                        # 지시사항
+                        st.markdown(f"**지시사항:**")
                         st.markdown(f"{item.get('directive', '')}")
                         
                         # 분석 결과 (expander로 접기)
